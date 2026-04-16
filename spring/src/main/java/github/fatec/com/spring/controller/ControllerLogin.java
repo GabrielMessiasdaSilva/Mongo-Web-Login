@@ -1,31 +1,42 @@
 package github.fatec.com.spring.controller;
 
-import github.fatec.com.entity.Login;
 import github.fatec.com.repository.RepositoryLogin;
 import github.fatec.com.spring.controller.adapter.AdapterControllerLogin;
 import github.fatec.com.spring.controller.dto.request.RequestLogin;
 import github.fatec.com.spring.controller.dto.response.ResponseLogin;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/login")
 public class ControllerLogin {
+
     private final RepositoryLogin repository;
     private final AdapterControllerLogin adapter = new AdapterControllerLogin();
+    private final PasswordEncoder passwordEncoder;
 
-    public ControllerLogin(RepositoryLogin repository) {
+    public ControllerLogin(RepositoryLogin repository,
+                           PasswordEncoder passwordEncoder) {
         this.repository = repository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ResponseLogin create(@RequestBody RequestLogin request) {
+
+        // 🔐 criptografa senha (ESSENCIAL)
         var login = adapter.toDomain(request);
-        return adapter.toResponse(repository.save(login));
+        var loginComSenhaCriptografada = new github.fatec.com.entity.Login(
+                login.id(),
+                login.userName(),
+                passwordEncoder.encode(login.password()),
+                login.roles()
+        );
+
+        return adapter.toResponse(repository.save(loginComSenhaCriptografada));
     }
 
     @GetMapping
@@ -34,10 +45,20 @@ public class ControllerLogin {
     }
 
     @PutMapping("/{id}")
-    public ResponseLogin update(@PathVariable String id, @RequestBody RequestLogin request) {
+    public ResponseLogin update(@PathVariable String id,
+                                @RequestBody RequestLogin request) {
+
         var login = adapter.toDomain(request);
 
-        return adapter.toResponse(repository.update(id, login));
+        // 🔐 criptografa senha também no update
+        var loginAtualizado = new github.fatec.com.entity.Login(
+                id,
+                login.userName(),
+                passwordEncoder.encode(login.password()),
+                login.roles()
+        );
+
+        return adapter.toResponse(repository.update(id, loginAtualizado));
     }
 
     @DeleteMapping("/{id}")
